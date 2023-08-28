@@ -33,9 +33,16 @@ class FraudDetector:
                     Suggestion('max_samples', 'float', 0.1, 1.0),
                     Suggestion('fraction', 'float', 0.001, 0.05, log=True),
                     Suggestion('max_features', 'float', 0.1, 1.0)],
-        "lof": [Suggestion('n_neighbors', 'int', 10, 1000),
-                Suggestion('leaf_size', 'int', 10, 1000),
+        'svm': [Suggestion('nu', 'float', 0.01, 0.99, log=True),
+                Suggestion('gamma', 'float', 0.1, 0.8),
+                Suggestion('fraction', 'float', 0.001, 0.05, log=True)],
+        "lof": [Suggestion('n_neighbors', 'int', 10, 100),
+                Suggestion('leaf_size', 'int', 10, 100),
                 Suggestion('p', 'float', 1.0,  2.0),
+                Suggestion('novelty', 'float', False,  False),
+                Suggestion('fraction', 'float', 0.001, 0.05, log=True)],
+        'sod': [Suggestion('n_neighbors', 'int', 10, 100),
+                Suggestion('ref_set_ratio', 'float', 0.1, 0.8),
                 Suggestion('fraction', 'float', 0.001, 0.05, log=True)]
     }
     def __init__(self, study_name:str, init_study:False, random_state = None, model_params: Dict[str, List[Suggestion]] = None) -> None:
@@ -101,6 +108,12 @@ class FraudDetector:
         
         def __objective(trial:Trial):
             params = {s.name:s.suggest(trial) for s in model_params}
+
+            if model_name=='sod':
+                r = params['ref_set_ratio']
+                del params['ref_set_ratio']
+                params['ref_set'] = int(params['n_neighbors'] * r) + 1
+            
             model = self.session.create_model(model_name, 
                            **params)
             print(f"model info: {model}")

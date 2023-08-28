@@ -7,6 +7,7 @@ from fraud_detector import FraudDetector
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--init_study", action="store_true", dest="init_study", default=False)
 parser.add_argument("-m", "--model_name", dest="model_name", type=str)
+parser.add_argument("-n", "--n_trial", dest="n_trial", type=int, default=100)
 
 args = parser.parse_args()
 print(f"arguments: {args}")
@@ -27,4 +28,4 @@ else:
     X_data = norm_data.fillna(norm_data.min()*2)
 
 det.set_experiment_session(X_data, Y_true)
-det.optimize(args.model_name, 100)
+det.optimize(args.model_name, args.n_trial)
