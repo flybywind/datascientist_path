@@ -35,7 +35,7 @@ class FraudDetector:
                     Suggestion('max_features', 'float', 0.1, 1.0)],
         "lof": [Suggestion('n_neighbors', 'int', 10, 1000),
                 Suggestion('leaf_size', 'int', 10, 1000),
-                Suggestion('p', 'float', 0.5,  2.0),
+                Suggestion('p', 'float', 1.0,  2.0),
                 Suggestion('fraction', 'float', 0.001, 0.05, log=True)]
     }
     def __init__(self, study_name:str, init_study:False, random_state = None, model_params: Dict[str, List[Suggestion]] = None) -> None:
@@ -71,10 +71,15 @@ class FraudDetector:
         print(self.session)
         self.Y_true = Y_true
 
-    def _inspect_sig(self, model_name):
+    def _inspect_constructor_sig(self, model_name):
         print(f'inspect input parameters of {model_name}')
-        model = self.session.create_model(model_name)
-        sig = inspect.signature(model.__init__)
+        cls_path = self.session.models()['Reference'][model_name].split(".")
+        mod = __import__(cls_path[0])
+        cls = mod
+        for attr in cls_path[1:]:
+            cls = getattr(cls, attr)
+
+        sig = inspect.signature(cls.__init__)
         print(f'input parameters of {model_name} is {sig}')
         return sig.parameters.keys()
     
@@ -82,11 +87,11 @@ class FraudDetector:
         if model_name not in self.model_params:
             raise RuntimeError(f"model: {model_name} not a supported model! plz check the name and its spelling")
         model_params = self.model_params[model_name]
-        all_params = self._inspect_sig(model_name)
+        all_params = self._inspect_constructor_sig(model_name)
         if 'random_state' in all_params:
-            model_name += [Suggestion('random_state', 'int', self.random_state, self.random_state)]
+            model_params += [Suggestion('random_state', 'int', self.random_state, self.random_state)]
         if 'n_jobs' in all_params:
-            model_name += [Suggestion('n_jobs', 'int', -1, -1)]
+            model_params += [Suggestion('n_jobs', 'int', -1, -1)]
 
         if self.session is None:
             raise RuntimeError(f"plz run set_experiment_session first")
