@@ -95,6 +95,7 @@ class FraudDetector:
             raise RuntimeError(f"model: {model_name} not a supported model! plz check the name and its spelling")
         model_params = self.model_params[model_name]
         all_params = self._inspect_constructor_sig(model_name)
+        # fix random_state to const value
         if 'random_state' in all_params:
             model_params += [Suggestion('random_state', 'int', self.random_state, self.random_state)]
         if 'n_jobs' in all_params:
@@ -108,12 +109,12 @@ class FraudDetector:
         
         def __objective(trial:Trial):
             params = {s.name:s.suggest(trial) for s in model_params}
-
+            # handle parameter dependences:
             if model_name=='sod':
                 r = params['ref_set_ratio']
                 del params['ref_set_ratio']
                 params['ref_set'] = int(params['n_neighbors'] * r) + 1
-            
+
             model = self.session.create_model(model_name, 
                            **params)
             print(f"model info: {model}")
@@ -127,26 +128,9 @@ class FraudDetector:
             
             curr_metric = self.objective(self.Y_true, anomaly_pred)
             if last_best is None or curr_metric < last_best:
-                model_file = f'iforest{trial.number}-{curr_metric}'
+                model_file = f'{model_name}{trial.number}-{curr_metric}'
                 _, model_file = self.session.save_model(model, model_file)
                 print(f"save best model at {path.abspath(model_file)}")
             return curr_metric
     
         self.study.optimize(__objective, n_trials=n_trials)
-
-
-if __name__ == "__main__":
-    import pandas as pd
-    from sklearn.metrics import fbeta_score
-
-    det = FraudDetector("iforest_test", init_study=True)
-    det.set_objective(lambda tr, pred: -fbeta_score(tr, pred, beta=2))
-
-
-    transaction_data = pd.read_csv("Data/credit_card_transactional_data.csv")
-    X_data = transaction_data.drop(["Class", "Timestamp"], axis=1)
-    X_data = X_data.fillna(X_data.min()*2)
-    Y_true = transaction_data['Class']
-    det.set_experiment_session(X_data, Y_true)
-
-    det.optimize("iforest", 100)
